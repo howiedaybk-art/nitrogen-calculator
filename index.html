@@ -109,6 +109,16 @@
             color: #7f8c8d;
         }
         
+        .date-input-only {
+            width: 100%;
+        }
+        
+        .date-level-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
         button {
             background-color: #3498db;
             color: white;
@@ -192,13 +202,17 @@
             font-size: 0.9rem;
         }
         
-        /* Стили для полей дат */
-        .date-input {
-            margin-bottom: 5px;
+        .compact-input-group {
+            display: flex;
+            gap: 10px;
         }
         
-        .level-input {
-            margin-top: 5px;
+        .compact-input-group .date-input {
+            flex: 1;
+        }
+        
+        .compact-input-group .level-input {
+            flex: 1;
         }
         
         @media (max-width: 768px) {
@@ -208,6 +222,11 @@
             
             .daily-inputs {
                 grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            }
+            
+            .compact-input-group {
+                flex-direction: column;
+                gap: 5px;
             }
         }
     </style>
@@ -240,11 +259,11 @@
                 </div>
                 
                 <div class="form-group">
-                    <label>Уровень азота за последние 7 дней (%)</label>
+                    <label>История уровня азота (%)</label>
                     <div class="daily-inputs" id="dailyInputsContainer">
                         <!-- Поля будут сгенерированы JavaScript -->
                     </div>
-                    <p class="info-text">Введите данные об уровне азота за указанные даты</p>
+                    <p class="info-text">Укажите уровень азота за предыдущие 6 дней</p>
                 </div>
                 
                 <button id="calculateBtn">Рассчитать поставку</button>
@@ -262,12 +281,6 @@
                     <div class="result-title">Средняя скорость потребления</div>
                     <div id="consumptionRate" class="result-value">-</div>
                     <p class="info-text">Рассчитано на основе данных за указанные даты</p>
-                </div>
-                
-                <div class="result-item">
-                    <div class="result-title">Объем заказа</div>
-                    <div id="orderResult" class="result-value">-</div>
-                    <p class="info-text">Рассчитано как <span id="orderPercent">45</span>% от текущего уровня</p>
                 </div>
                 
                 <div class="result-item">
@@ -292,6 +305,7 @@
                     <p><strong>Параметры системы:</strong></p>
                     <p>• Минимальный уровень в емкости: 30%</p>
                     <p>• Максимальный уровень в емкости: 90%</p>
+                    <p>• Объем заказа: 45% от текущего уровня</p>
                     <p>• Формула расчета: (Текущий уровень - Минимальный остаток) / Средняя скорость потребления - Дни доставки</p>
                     <p>• Данные сохраняются автоматически в вашем браузере</p>
                 </div>
