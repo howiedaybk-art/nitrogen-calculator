@@ -92,7 +92,7 @@
         
         .daily-inputs {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
             gap: 10px;
             margin-top: 15px;
         }
@@ -192,13 +192,22 @@
             font-size: 0.9rem;
         }
         
+        /* Стили для полей дат */
+        .date-input {
+            margin-bottom: 5px;
+        }
+        
+        .level-input {
+            margin-top: 5px;
+        }
+        
         @media (max-width: 768px) {
             .main-content {
                 flex-direction: column;
             }
             
             .daily-inputs {
-                grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+                grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
             }
         }
     </style>
@@ -232,37 +241,10 @@
                 
                 <div class="form-group">
                     <label>Уровень азота за последние 7 дней (%)</label>
-                    <div class="daily-inputs">
-                        <div class="daily-input">
-                            <label for="day7">7 дней назад</label>
-                            <input type="number" id="day7" min="0" max="100" step="0.1" placeholder="0-100%">
-                        </div>
-                        <div class="daily-input">
-                            <label for="day6">6 дней назад</label>
-                            <input type="number" id="day6" min="0" max="100" step="0.1" placeholder="0-100%">
-                        </div>
-                        <div class="daily-input">
-                            <label for="day5">5 дней назад</label>
-                            <input type="number" id="day5" min="0" max="100" step="0.1" placeholder="0-100%">
-                        </div>
-                        <div class="daily-input">
-                            <label for="day4">4 дня назад</label>
-                            <input type="number" id="day4" min="0" max="100" step="0.1" placeholder="0-100%">
-                        </div>
-                        <div class="daily-input">
-                            <label for="day3">3 дня назад</label>
-                            <input type="number" id="day3" min="0" max="100" step="0.1" placeholder="0-100%">
-                        </div>
-                        <div class="daily-input">
-                            <label for="day2">2 дня назад</label>
-                            <input type="number" id="day2" min="0" max="100" step="0.1" placeholder="0-100%">
-                        </div>
-                        <div class="daily-input">
-                            <label for="day1">1 день назад</label>
-                            <input type="number" id="day1" min="0" max="100" step="0.1" placeholder="0-100%">
-                        </div>
+                    <div class="daily-inputs" id="dailyInputsContainer">
+                        <!-- Поля будут сгенерированы JavaScript -->
                     </div>
-                    <p class="info-text">Введите данные об уровне азота за последние 7 дней</p>
+                    <p class="info-text">Введите данные об уровне азота за указанные даты</p>
                 </div>
                 
                 <button id="calculateBtn">Рассчитать поставку</button>
@@ -279,7 +261,7 @@
                 <div class="result-item">
                     <div class="result-title">Средняя скорость потребления</div>
                     <div id="consumptionRate" class="result-value">-</div>
-                    <p class="info-text">Рассчитано на основе данных за 7 дней</p>
+                    <p class="info-text">Рассчитано на основе данных за указанные даты</p>
                 </div>
                 
                 <div class="result-item">
@@ -311,6 +293,7 @@
                     <p>• Минимальный уровень в емкости: 30%</p>
                     <p>• Максимальный уровень в емкости: 90%</p>
                     <p>• Формула расчета: (Текущий уровень - Минимальный остаток) / Средняя скорость потребления - Дни доставки</p>
+                    <p>• Данные сохраняются автоматически в вашем браузере</p>
                 </div>
             </section>
         </div>
