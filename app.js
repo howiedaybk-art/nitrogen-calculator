@@ -20,12 +20,17 @@ const orderPercentElement = document.getElementById('orderPercent');
 
 // Массив для хранения элементов полей ввода за 7 дней
 const dailyInputs = [];
+const dailyDateInputs = [];
 for (let i = 1; i <= 7; i++) {
     dailyInputs.push(document.getElementById(`day${i}`));
+    // Создаем поля для дат
+    const dateInputId = `date${i}`;
+    dailyDateInputs.push(dateInputId);
 }
 
 // Загрузка данных из localStorage при загрузке страницы
 document.addEventListener('DOMContentLoaded', function() {
+    initializeDateInputs(); // Инициализация дат
     loadSavedData();
     calculateBtn.addEventListener('click', calculateDelivery);
     saveDataBtn.addEventListener('click', saveData);
@@ -36,10 +41,61 @@ document.addEventListener('DOMContentLoaded', function() {
         input.addEventListener('change', saveData);
     });
     
+    // Добавляем обработчики для полей дат
+    dailyDateInputs.forEach(dateId => {
+        const input = document.getElementById(dateId);
+        if (input) {
+            input.addEventListener('change', saveData);
+        }
+    });
+    
     currentLevelInput.addEventListener('change', saveData);
     deliveryDaysInput.addEventListener('change', saveData);
     orderVolumeInput.addEventListener('change', saveData);
 });
+
+// Инициализация полей с датами
+function initializeDateInputs() {
+    const dailyInputsContainer = document.querySelector('.daily-inputs');
+    if (!dailyInputsContainer) return;
+    
+    // Очищаем контейнер
+    dailyInputsContainer.innerHTML = '';
+    
+    // Создаем поля для последних 7 дней
+    for (let i = 0; i < 7; i++) {
+        const date = new Date();
+        date.setDate(date.getDate() - (6 - i)); // От 6 дней назад до сегодня
+        
+        const dayInput = document.createElement('div');
+        dayInput.className = 'daily-input';
+        
+        const dateStr = formatDateForInput(date);
+        const displayDateStr = formatDateForDisplay(date);
+        
+        dayInput.innerHTML = `
+            <label for="date${i+1}">${displayDateStr}</label>
+            <input type="date" id="date${i+1}" value="${dateStr}">
+            <input type="number" id="day${i+1}" min="0" max="100" step="0.1" placeholder="0-100%" style="margin-top: 5px;">
+        `;
+        
+        dailyInputsContainer.appendChild(dayInput);
+    }
+}
+
+// Форматирование даты для input[type="date"]
+function formatDateForInput(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+// Форматирование даты для отображения
+function formatDateForDisplay(date) {
+    const options = { weekday: 'short', day: 'numeric', month: 'short' };
+    return date.toLocaleDateString('ru-RU', options);
+}
 
 // Функция загрузки сохраненных данных
 function loadSavedData() {
@@ -54,6 +110,14 @@ function loadSavedData() {
                 }
             });
             
+            // Загружаем даты
+            dailyDateInputs.forEach((dateId, index) => {
+                const input = document.getElementById(dateId);
+                if (input && savedData.dailyDates && savedData.dailyDates[index]) {
+                    input.value = savedData.dailyDates[index];
+                }
+            });
+            
             // Загружаем другие данные
             if (savedData.currentLevel !== undefined) currentLevelInput.value = savedData.currentLevel;
             if (savedData.deliveryDays !== undefined) deliveryDaysInput.value = savedData.deliveryDays;
@@ -65,6 +129,8 @@ function loadSavedData() {
             console.log('Данные успешно загружены из localStorage');
         } catch (error) {
             console.error('Ошибка при загрузке данных:', error);
+            // Если есть ошибка, инициализируем даты заново
+            initializeDateInputs();
         }
     } else {
         console.log('Сохраненные данные не найдены');
@@ -73,10 +139,26 @@ function loadSavedData() {
 
 // Функция сохранения данных
 function saveData() {
-    const dailyLevels = dailyInputs.map(input => parseFloat(input.value) || 0);
+    const dailyLevels = [];
+    const dailyDates = [];
+    
+    // Собираем данные за 7 дней
+    for (let i = 1; i <= 7; i++) {
+        const levelInput = document.getElementById(`day${i}`);
+        const dateInput = document.getElementById(`date${i}`);
+        
+        if (levelInput) {
+            dailyLevels.push(parseFloat(levelInput.value) || 0);
+        }
+        
+        if (dateInput) {
+            dailyDates.push(dateInput.value || formatDateForInput(new Date(Date.now() - (7 - i) * 24 * 60 * 60 * 1000)));
+        }
+    }
     
     const dataToSave = {
         dailyLevels: dailyLevels,
+        dailyDates: dailyDates,
         currentLevel: parseFloat(currentLevelInput.value) || 0,
         deliveryDays: parseInt(deliveryDaysInput.value) || 0,
         orderVolume: parseFloat(orderVolumeInput.value) || 45,
@@ -98,8 +180,13 @@ function saveData() {
 // Функция сброса данных
 function resetData() {
     if (confirm('Вы уверены, что хотите сбросить все данные? Это действие нельзя отменить.')) {
-        // Очищаем поля ввода
+        // Очищаем поля ввода уровней
         dailyInputs.forEach(input => input.value = '');
+        
+        // Сбрасываем даты на последние 7 дней
+        initializeDateInputs();
+        
+        // Очищаем другие поля
         currentLevelInput.value = '';
         deliveryDaysInput.value = '';
         orderVolumeInput.value = '45';
@@ -119,32 +206,60 @@ function resetData() {
     }
 }
 
-// Функция расчета средней скорости потребления
+// Функция расчета средней скорости потребления (ИСПРАВЛЕННАЯ)
 function calculateConsumptionRate() {
-    let validDays = 0;
-    let totalConsumption = 0;
+    const levelData = [];
     
-    // Рассчитываем потребление для каждого дня
-    for (let i = 0; i < dailyInputs.length - 1; i++) {
-        const todayValue = parseFloat(dailyInputs[i].value);
-        const yesterdayValue = parseFloat(dailyInputs[i + 1].value);
+    // Собираем данные об уровнях и датах
+    for (let i = 1; i <= 7; i++) {
+        const levelInput = document.getElementById(`day${i}`);
+        const dateInput = document.getElementById(`date${i}`);
         
-        // Проверяем, что оба значения валидны
-        if (!isNaN(todayValue) && !isNaN(yesterdayValue) && 
-            todayValue >= 0 && todayValue <= 100 && 
-            yesterdayValue >= 0 && yesterdayValue <= 100) {
+        if (levelInput && dateInput && levelInput.value && dateInput.value) {
+            const level = parseFloat(levelInput.value);
+            const date = new Date(dateInput.value);
             
-            // Потребление = разница между вчерашним и сегодняшним уровнем
-            const dailyConsumption = yesterdayValue - todayValue;
-            if (dailyConsumption > 0) {
-                totalConsumption += dailyConsumption;
-                validDays++;
+            if (!isNaN(level) && level >= 0 && level <= 100 && date instanceof Date && !isNaN(date.getTime())) {
+                levelData.push({
+                    date: date,
+                    level: level
+                });
             }
         }
     }
     
-    // Возвращаем среднее потребление или 0, если нет данных
-    return validDays > 0 ? totalConsumption / validDays : 0;
+    // Сортируем по дате (от старых к новым)
+    levelData.sort((a, b) => a.date - b.date);
+    
+    // Если данных меньше 2, нельзя рассчитать потребление
+    if (levelData.length < 2) {
+        console.log('Недостаточно данных для расчета скорости потребления');
+        return 0;
+    }
+    
+    // Рассчитываем общее потребление за весь период
+    const firstData = levelData[0];
+    const lastData = levelData[levelData.length - 1];
+    
+    // Разница в уровне между первым и последним измерением
+    const totalLevelDifference = firstData.level - lastData.level;
+    
+    // Разница во времени в днях
+    const timeDifferenceInMs = lastData.date - firstData.date;
+    const timeDifferenceInDays = timeDifferenceInMs / (1000 * 60 * 60 * 24);
+    
+    // Если разница во времени слишком мала или отрицательная
+    if (timeDifferenceInDays <= 0) {
+        console.log('Некорректный временной интервал');
+        return 0;
+    }
+    
+    // Средняя скорость потребления в %/день
+    const avgConsumption = totalLevelDifference / timeDifferenceInDays;
+    
+    console.log(`Расчет потребления: разница уровней = ${totalLevelDifference}%, период = ${timeDifferenceInDays.toFixed(1)} дней, скорость = ${avgConsumption.toFixed(2)}%/день`);
+    
+    return avgConsumption > 0 ? avgConsumption : 0;
 }
 
 // Функция расчета поставки
@@ -168,21 +283,20 @@ function calculateDelivery() {
     // Обновляем отображаемый процент заказа
     orderPercentElement.textContent = orderVolumePercent;
     
-    // Рассчитываем среднюю скорость потребления
+    // Рассчитываем среднюю скорость потребления (ИСПРАВЛЕННЫЙ РАСЧЕТ)
     const avgConsumption = calculateConsumptionRate();
     
     // Рассчитываем объем заказа
     const orderVolume = (currentLevel * orderVolumePercent) / 100;
     
     // Рассчитываем, через сколько дней достигнем минимального уровня
-    // Формула: (Текущий уровень - Минимальный остаток) / Средняя скорость потребления
     let daysToMinLevel = 0;
     if (avgConsumption > 0) {
         daysToMinLevel = (currentLevel - MIN_LEVEL) / avgConsumption;
+        console.log(`Дней до мин. уровня: (${currentLevel} - ${MIN_LEVEL}) / ${avgConsumption.toFixed(2)} = ${daysToMinLevel.toFixed(1)}`);
     }
     
     // Рассчитываем рекомендуемую дату заказа (с учетом дней доставки)
-    // Заказ нужно сделать за дней доставки до достижения минимального уровня
     let daysToOrder = Math.floor(daysToMinLevel - deliveryDays);
     
     // Если дней до заказа уже мало или отрицательное значение, рекомендуем заказ сегодня
@@ -201,6 +315,7 @@ function calculateDelivery() {
     // Форматируем даты для отображения
     const formatDate = (date) => {
         return date.toLocaleDateString('ru-RU', {
+            weekday: 'short',
             day: '2-digit',
             month: '2-digit',
             year: 'numeric'
@@ -208,12 +323,8 @@ function calculateDelivery() {
     };
     
     // Обновляем результаты на странице
-    consumptionRateElement.textContent = avgConsumption > 0 ? 
-        `${avgConsumption.toFixed(2)}% в день` : 'Недостаточно данных';
-    
-    orderResultElement.textContent = `${orderVolume.toFixed(1)}%`;
-    
     if (avgConsumption > 0) {
+        consumptionRateElement.textContent = `${avgConsumption.toFixed(2)}% в день`;
         daysToDeliveryElement.textContent = `${Math.floor(daysToMinLevel)} дней`;
         orderDateElement.textContent = formatDate(orderDate);
         deliveryDateElement.textContent = formatDate(deliveryDate);
@@ -223,10 +334,13 @@ function calculateDelivery() {
             orderDateElement.innerHTML = `${formatDate(orderDate)} <span style="color:#e74c3c; font-size:1rem;">(СРОЧНО!)</span>`;
         }
     } else {
+        consumptionRateElement.textContent = 'Недостаточно данных';
         daysToDeliveryElement.textContent = 'Недостаточно данных';
         orderDateElement.textContent = 'Недостаточно данных';
         deliveryDateElement.textContent = 'Недостаточно данных';
     }
+    
+    orderResultElement.textContent = `${orderVolume.toFixed(1)}%`;
     
     // Автоматически сохраняем данные после расчета
     saveData();
