@@ -1,7 +1,6 @@
 // Константы системы
 const MIN_LEVEL = 30; // Минимальный уровень в емкости (%)
 const MAX_LEVEL = 90; // Максимальный уровень в емкости (%)
-const ORDER_VOLUME = 16; // Объем заказа (тонн)
 const ORDER_PERCENTAGE = 45; // Прибавка к текущему уровню при заказе (%)
 
 // Ключи для localStorage
@@ -38,7 +37,7 @@ function initializeConsumptionGrid() {
         dayInput.className = 'consumption-day';
         dayInput.innerHTML = `
             <span class="day-label">${dayLabel}</span>
-            <input type="number" id="day-${i}" min="0" max="100" step="0.1" placeholder="0.0 т">
+            <input type="number" id="day-${i}" min="0" max="100" step="0.1" placeholder="0.0%">
         `;
         
         grid.appendChild(dayInput);
@@ -157,7 +156,7 @@ function calculateDelivery() {
         return;
     }
     
-    // Получение данных о потреблении
+    // Получение данных о потреблении (в процентах)
     const consumptionData = [];
     let totalConsumption = 0;
     let validDays = 0;
@@ -173,17 +172,21 @@ function calculateDelivery() {
         }
     }
     
-    // Расчет средней скорости потребления за день
+    // Расчет средней скорости потребления за день (в процентах)
     const avgDailyConsumption = validDays > 0 ? totalConsumption / 7 : 0;
     
-    // Расчет по формуле: (Текущий уровень - Минимальный остаток) / Скорость потребления за 7 последних дней - Дни доставки
+    // Расчет дней до заказа по формуле: 
+    // (Текущий уровень - Минимальный остаток) / Скорость потребления за 7 последних дней - Дни доставки
     let daysUntilOrder = 0;
     let status = 'normal';
     let statusMessage = '';
     
     if (avgDailyConsumption > 0) {
-        daysUntilOrder = ((currentLevel - MIN_LEVEL) / (100 / ORDER_PERCENTAGE * avgDailyConsumption)) - deliveryDays;
+        daysUntilOrder = (currentLevel - MIN_LEVEL) / avgDailyConsumption - deliveryDays;
         daysUntilOrder = Math.round(daysUntilOrder * 10) / 10; // Округление до одного знака после запятой
+    } else if (currentLevel > MIN_LEVEL) {
+        // Если потребления нет, но уровень выше минимального
+        daysUntilOrder = Infinity;
     }
     
     // Определение статуса и рекомендаций
@@ -201,6 +204,10 @@ function calculateDelivery() {
         status = 'warning';
         statusMessage = 'ПРИБЛИЖАЕТСЯ ВРЕМЯ ЗАКАЗА';
         recommendation = `Рекомендуется заказать поставку в течение ${Math.ceil(daysUntilOrder)} дней.`;
+    } else if (daysUntilOrder === Infinity) {
+        status = 'ok';
+        statusMessage = 'НОРМА (нет потребления)';
+        recommendation = 'Потребление азота не зафиксировано за последние 7 дней.';
     } else {
         status = 'ok';
         statusMessage = 'НОРМА';
@@ -241,6 +248,15 @@ function displayResults(data) {
     const statusClass = data.status === 'critical' ? 'warning' : 
                        data.status === 'warning' ? 'info' : 'ok';
     
+    let daysDisplay = '';
+    if (data.daysUntilOrder === Infinity) {
+        daysDisplay = '∞ дней (нет потребления)';
+    } else if (data.daysUntilOrder > 1000) {
+        daysDisplay = '∞ дней';
+    } else {
+        daysDisplay = `${data.daysUntilOrder > 0 ? data.daysUntilOrder.toFixed(1) : '0'} дней`;
+    }
+    
     let resultsHTML = `
         <div class="results">
             <div class="result-item">
@@ -255,13 +271,13 @@ function displayResults(data) {
             
             <div class="result-item">
                 <div class="result-label">Среднее потребление за день (за 7 дней):</div>
-                <div class="result-value">${data.avgDailyConsumption.toFixed(2)} тонн</div>
-                <div style="font-size: 14px; color: #7f8c8d;">Всего за 7 дней: ${data.totalConsumption.toFixed(2)} тонн</div>
+                <div class="result-value">${data.avgDailyConsumption.toFixed(2)}%</div>
+                <div style="font-size: 14px; color: #7f8c8d;">Всего за 7 дней: ${data.totalConsumption.toFixed(2)}%</div>
             </div>
             
             <div class="result-item">
                 <div class="result-label">Дней до необходимого заказа:</div>
-                <div class="result-value">${data.daysUntilOrder > 0 ? data.daysUntilOrder.toFixed(1) : '0'} дней</div>
+                <div class="result-value">${daysDisplay}</div>
             </div>
             
             <div class="result-item">
@@ -270,9 +286,9 @@ function displayResults(data) {
             </div>
             
             <div class="result-item">
-                <div class="result-label">Уровень после поставки (16 тонн):</div>
+                <div class="result-label">Уровень после поставки:</div>
                 <div class="result-value">${data.newLevelAfterOrder}%</div>
-                <div style="font-size: 14px; color: #7f8c8d;">Прибавка: ${ORDER_PERCENTAGE}% (${ORDER_VOLUME} тонн)</div>
+                <div style="font-size: 14px; color: #7f8c8d;">Прибавка: ${ORDER_PERCENTAGE}%</div>
             </div>
         </div>
     `;
