@@ -1,297 +1,281 @@
 // Константы системы
 const MIN_LEVEL = 30; // Минимальный уровень в емкости (%)
 const MAX_LEVEL = 90; // Максимальный уровень в емкости (%)
-const ORDER_PERCENTAGE = 45; // Прибавка к текущему уровню при заказе (%)
 
-// Ключи для localStorage
-const STORAGE_KEYS = {
-    CONSUMPTION: 'nitrogen_consumption_data',
-    CURRENT_LEVEL: 'nitrogen_current_level',
-    DELIVERY_DAYS: 'nitrogen_delivery_days'
-};
+// Элементы DOM
+const currentLevelInput = document.getElementById('currentLevel');
+const deliveryDaysInput = document.getElementById('deliveryDays');
+const orderVolumeInput = document.getElementById('orderVolume');
+const calculateBtn = document.getElementById('calculateBtn');
+const saveDataBtn = document.getElementById('saveDataBtn');
+const resetDataBtn = document.getElementById('resetDataBtn');
 
-// Инициализация при загрузке страницы
+// Элементы для отображения результатов
+const consumptionRateElement = document.getElementById('consumptionRate');
+const orderResultElement = document.getElementById('orderResult');
+const daysToDeliveryElement = document.getElementById('daysToDelivery');
+const orderDateElement = document.getElementById('orderDate');
+const deliveryDateElement = document.getElementById('deliveryDate');
+const orderPercentElement = document.getElementById('orderPercent');
+
+// Массив для хранения элементов полей ввода за 7 дней
+const dailyInputs = [];
+for (let i = 1; i <= 7; i++) {
+    dailyInputs.push(document.getElementById(`day${i}`));
+}
+
+// Загрузка данных из localStorage при загрузке страницы
 document.addEventListener('DOMContentLoaded', function() {
-    initializeConsumptionGrid();
     loadSavedData();
-    setupEventListeners();
+    calculateBtn.addEventListener('click', calculateDelivery);
+    saveDataBtn.addEventListener('click', saveData);
+    resetDataBtn.addEventListener('click', resetData);
+    
+    // Автоматически сохраняем данные при изменении
+    dailyInputs.forEach(input => {
+        input.addEventListener('change', saveData);
+    });
+    
+    currentLevelInput.addEventListener('change', saveData);
+    deliveryDaysInput.addEventListener('change', saveData);
+    orderVolumeInput.addEventListener('change', saveData);
 });
 
-// Инициализация сетки для ввода данных о потреблении
-function initializeConsumptionGrid() {
-    const grid = document.getElementById('consumption-grid');
-    grid.innerHTML = '';
-    
-    // Создаем поля для ввода данных за последние 7 дней
-    for (let i = 6; i >= 0; i--) {
-        const date = new Date();
-        date.setDate(date.getDate() - i);
-        
-        const dayLabel = date.toLocaleDateString('ru-RU', { 
-            weekday: 'short', 
-            day: 'numeric', 
-            month: 'short' 
-        });
-        
-        const dayInput = document.createElement('div');
-        dayInput.className = 'consumption-day';
-        dayInput.innerHTML = `
-            <span class="day-label">${dayLabel}</span>
-            <input type="number" id="day-${i}" min="0" max="100" step="0.1" placeholder="0.0%">
-        `;
-        
-        grid.appendChild(dayInput);
+// Функция загрузки сохраненных данных
+function loadSavedData() {
+    if (localStorage.getItem('nitrogenData')) {
+        try {
+            const savedData = JSON.parse(localStorage.getItem('nitrogenData'));
+            
+            // Загружаем данные за 7 дней
+            dailyInputs.forEach((input, index) => {
+                if (savedData.dailyLevels && savedData.dailyLevels[index] !== undefined) {
+                    input.value = savedData.dailyLevels[index];
+                }
+            });
+            
+            // Загружаем другие данные
+            if (savedData.currentLevel !== undefined) currentLevelInput.value = savedData.currentLevel;
+            if (savedData.deliveryDays !== undefined) deliveryDaysInput.value = savedData.deliveryDays;
+            if (savedData.orderVolume !== undefined) {
+                orderVolumeInput.value = savedData.orderVolume;
+                orderPercentElement.textContent = savedData.orderVolume;
+            }
+            
+            console.log('Данные успешно загружены из localStorage');
+        } catch (error) {
+            console.error('Ошибка при загрузке данных:', error);
+        }
+    } else {
+        console.log('Сохраненные данные не найдены');
     }
 }
 
-// Загрузка сохраненных данных
-function loadSavedData() {
-    // Загрузка данных о потреблении
-    const consumptionData = loadConsumptionData();
-    if (consumptionData) {
-        for (let i = 0; i < 7; i++) {
-            const input = document.getElementById(`day-${i}`);
-            if (input && consumptionData[i] !== undefined) {
-                input.value = consumptionData[i];
+// Функция сохранения данных
+function saveData() {
+    const dailyLevels = dailyInputs.map(input => parseFloat(input.value) || 0);
+    
+    const dataToSave = {
+        dailyLevels: dailyLevels,
+        currentLevel: parseFloat(currentLevelInput.value) || 0,
+        deliveryDays: parseInt(deliveryDaysInput.value) || 0,
+        orderVolume: parseFloat(orderVolumeInput.value) || 45,
+        lastUpdated: new Date().toISOString()
+    };
+    
+    try {
+        localStorage.setItem('nitrogenData', JSON.stringify(dataToSave));
+        console.log('Данные успешно сохранены');
+        
+        // Показываем уведомление о сохранении
+        showNotification('Данные сохранены!', 'success');
+    } catch (error) {
+        console.error('Ошибка при сохранении данных:', error);
+        showNotification('Ошибка при сохранении данных', 'error');
+    }
+}
+
+// Функция сброса данных
+function resetData() {
+    if (confirm('Вы уверены, что хотите сбросить все данные? Это действие нельзя отменить.')) {
+        // Очищаем поля ввода
+        dailyInputs.forEach(input => input.value = '');
+        currentLevelInput.value = '';
+        deliveryDaysInput.value = '';
+        orderVolumeInput.value = '45';
+        orderPercentElement.textContent = '45';
+        
+        // Очищаем результаты
+        consumptionRateElement.textContent = '-';
+        orderResultElement.textContent = '-';
+        daysToDeliveryElement.textContent = '-';
+        orderDateElement.textContent = '-';
+        deliveryDateElement.textContent = '-';
+        
+        // Удаляем данные из localStorage
+        localStorage.removeItem('nitrogenData');
+        
+        showNotification('Все данные сброшены', 'info');
+    }
+}
+
+// Функция расчета средней скорости потребления
+function calculateConsumptionRate() {
+    let validDays = 0;
+    let totalConsumption = 0;
+    
+    // Рассчитываем потребление для каждого дня
+    for (let i = 0; i < dailyInputs.length - 1; i++) {
+        const todayValue = parseFloat(dailyInputs[i].value);
+        const yesterdayValue = parseFloat(dailyInputs[i + 1].value);
+        
+        // Проверяем, что оба значения валидны
+        if (!isNaN(todayValue) && !isNaN(yesterdayValue) && 
+            todayValue >= 0 && todayValue <= 100 && 
+            yesterdayValue >= 0 && yesterdayValue <= 100) {
+            
+            // Потребление = разница между вчерашним и сегодняшним уровнем
+            const dailyConsumption = yesterdayValue - todayValue;
+            if (dailyConsumption > 0) {
+                totalConsumption += dailyConsumption;
+                validDays++;
             }
         }
     }
     
-    // Загрузка текущего уровня
-    const savedLevel = localStorage.getItem(STORAGE_KEYS.CURRENT_LEVEL);
-    if (savedLevel) {
-        document.getElementById('current-level').value = savedLevel;
-    }
-    
-    // Загрузка дней доставки
-    const savedDeliveryDays = localStorage.getItem(STORAGE_KEYS.DELIVERY_DAYS);
-    if (savedDeliveryDays) {
-        document.getElementById('delivery-days').value = savedDeliveryDays;
-    }
+    // Возвращаем среднее потребление или 0, если нет данных
+    return validDays > 0 ? totalConsumption / validDays : 0;
 }
 
-// Загрузка данных о потреблении из localStorage
-function loadConsumptionData() {
-    const data = localStorage.getItem(STORAGE_KEYS.CONSUMPTION);
-    if (data) {
-        return JSON.parse(data);
-    }
-    return null;
-}
-
-// Сохранение данных о потреблении
-function saveConsumptionData() {
-    const consumptionData = [];
-    for (let i = 0; i < 7; i++) {
-        const input = document.getElementById(`day-${i}`);
-        consumptionData.push(input.value ? parseFloat(input.value) : 0);
-    }
-    localStorage.setItem(STORAGE_KEYS.CONSUMPTION, JSON.stringify(consumptionData));
-}
-
-// Настройка обработчиков событий
-function setupEventListeners() {
-    // Кнопка расчета
-    document.getElementById('calculate-btn').addEventListener('click', calculateDelivery);
-    
-    // Кнопка очистки данных
-    document.getElementById('clear-data-btn').addEventListener('click', clearSavedData);
-    
-    // Автосохранение при изменении полей ввода
-    document.getElementById('current-level').addEventListener('input', function() {
-        localStorage.setItem(STORAGE_KEYS.CURRENT_LEVEL, this.value);
-    });
-    
-    document.getElementById('delivery-days').addEventListener('input', function() {
-        localStorage.setItem(STORAGE_KEYS.DELIVERY_DAYS, this.value);
-    });
-    
-    // Автосохранение данных о потреблении
-    for (let i = 0; i < 7; i++) {
-        const input = document.getElementById(`day-${i}`);
-        if (input) {
-            input.addEventListener('input', saveConsumptionData);
-        }
-    }
-}
-
-// Очистка сохраненных данных
-function clearSavedData() {
-    if (confirm('Вы уверены, что хотите очистить все сохраненные данные?')) {
-        localStorage.removeItem(STORAGE_KEYS.CONSUMPTION);
-        localStorage.removeItem(STORAGE_KEYS.CURRENT_LEVEL);
-        localStorage.removeItem(STORAGE_KEYS.DELIVERY_DAYS);
-        
-        // Очистка полей ввода
-        document.getElementById('current-level').value = '';
-        document.getElementById('delivery-days').value = '';
-        
-        for (let i = 0; i < 7; i++) {
-            const input = document.getElementById(`day-${i}`);
-            if (input) input.value = '';
-        }
-        
-        // Обновление результатов
-        document.getElementById('results-container').innerHTML = 
-            '<p style="color: #95a5a6; text-align: center;">Данные очищены. Введите новые данные и нажмите "Рассчитать поставку"</p>';
-        
-        alert('Все данные очищены');
-    }
-}
-
-// Основная функция расчета
+// Функция расчета поставки
 function calculateDelivery() {
-    // Получение введенных данных
-    const currentLevel = parseFloat(document.getElementById('current-level').value);
-    const deliveryDays = parseFloat(document.getElementById('delivery-days').value);
+    // Получаем значения из полей ввода
+    const currentLevel = parseFloat(currentLevelInput.value);
+    const deliveryDays = parseInt(deliveryDaysInput.value);
+    const orderVolumePercent = parseFloat(orderVolumeInput.value);
     
-    // Валидация введенных данных
-    if (isNaN(currentLevel) || isNaN(deliveryDays)) {
-        showError('Пожалуйста, заполните все обязательные поля');
+    // Проверяем введенные данные
+    if (isNaN(currentLevel) || currentLevel < 0 || currentLevel > 100) {
+        showNotification('Пожалуйста, введите корректный текущий уровень (0-100%)', 'error');
         return;
     }
     
-    if (currentLevel < 0 || currentLevel > 100) {
-        showError('Текущий уровень должен быть в диапазоне от 0 до 100%');
+    if (isNaN(deliveryDays) || deliveryDays < 0) {
+        showNotification('Пожалуйста, введите корректное количество дней доставки', 'error');
         return;
     }
     
-    // Получение данных о потреблении (в процентах)
-    const consumptionData = [];
-    let totalConsumption = 0;
-    let validDays = 0;
+    // Обновляем отображаемый процент заказа
+    orderPercentElement.textContent = orderVolumePercent;
     
-    for (let i = 0; i < 7; i++) {
-        const input = document.getElementById(`day-${i}`);
-        const value = input.value ? parseFloat(input.value) : 0;
-        consumptionData.push(value);
+    // Рассчитываем среднюю скорость потребления
+    const avgConsumption = calculateConsumptionRate();
+    
+    // Рассчитываем объем заказа
+    const orderVolume = (currentLevel * orderVolumePercent) / 100;
+    
+    // Рассчитываем, через сколько дней достигнем минимального уровня
+    // Формула: (Текущий уровень - Минимальный остаток) / Средняя скорость потребления
+    let daysToMinLevel = 0;
+    if (avgConsumption > 0) {
+        daysToMinLevel = (currentLevel - MIN_LEVEL) / avgConsumption;
+    }
+    
+    // Рассчитываем рекомендуемую дату заказа (с учетом дней доставки)
+    // Заказ нужно сделать за дней доставки до достижения минимального уровня
+    let daysToOrder = Math.floor(daysToMinLevel - deliveryDays);
+    
+    // Если дней до заказа уже мало или отрицательное значение, рекомендуем заказ сегодня
+    if (daysToOrder < 0) {
+        daysToOrder = 0;
+    }
+    
+    // Рассчитываем даты
+    const today = new Date();
+    const orderDate = new Date(today);
+    orderDate.setDate(orderDate.getDate() + daysToOrder);
+    
+    const deliveryDate = new Date(orderDate);
+    deliveryDate.setDate(deliveryDate.getDate() + deliveryDays);
+    
+    // Форматируем даты для отображения
+    const formatDate = (date) => {
+        return date.toLocaleDateString('ru-RU', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+        });
+    };
+    
+    // Обновляем результаты на странице
+    consumptionRateElement.textContent = avgConsumption > 0 ? 
+        `${avgConsumption.toFixed(2)}% в день` : 'Недостаточно данных';
+    
+    orderResultElement.textContent = `${orderVolume.toFixed(1)}%`;
+    
+    if (avgConsumption > 0) {
+        daysToDeliveryElement.textContent = `${Math.floor(daysToMinLevel)} дней`;
+        orderDateElement.textContent = formatDate(orderDate);
+        deliveryDateElement.textContent = formatDate(deliveryDate);
         
-        if (value > 0) {
-            totalConsumption += value;
-            validDays++;
+        // Добавляем предупреждение, если сроки близки
+        if (daysToOrder <= 2) {
+            orderDateElement.innerHTML = `${formatDate(orderDate)} <span style="color:#e74c3c; font-size:1rem;">(СРОЧНО!)</span>`;
         }
-    }
-    
-    // Расчет средней скорости потребления за день (в процентах)
-    const avgDailyConsumption = validDays > 0 ? totalConsumption / 7 : 0;
-    
-    // Расчет дней до заказа по формуле: 
-    // (Текущий уровень - Минимальный остаток) / Скорость потребления за 7 последних дней - Дни доставки
-    let daysUntilOrder = 0;
-    let status = 'normal';
-    let statusMessage = '';
-    
-    if (avgDailyConsumption > 0) {
-        daysUntilOrder = (currentLevel - MIN_LEVEL) / avgDailyConsumption - deliveryDays;
-        daysUntilOrder = Math.round(daysUntilOrder * 10) / 10; // Округление до одного знака после запятой
-    } else if (currentLevel > MIN_LEVEL) {
-        // Если потребления нет, но уровень выше минимального
-        daysUntilOrder = Infinity;
-    }
-    
-    // Определение статуса и рекомендаций
-    let recommendation = '';
-    
-    if (currentLevel <= MIN_LEVEL) {
-        status = 'critical';
-        statusMessage = 'КРИТИЧЕСКИЙ УРОВЕНЬ!';
-        recommendation = 'Необходимо срочно заказать поставку. Текущий уровень на минимальной отметке или ниже.';
-    } else if (daysUntilOrder <= 0) {
-        status = 'warning';
-        statusMessage = 'ТРЕБУЕТСЯ ЗАКАЗ';
-        recommendation = 'Рекомендуется заказать поставку немедленно.';
-    } else if (daysUntilOrder <= deliveryDays) {
-        status = 'warning';
-        statusMessage = 'ПРИБЛИЖАЕТСЯ ВРЕМЯ ЗАКАЗА';
-        recommendation = `Рекомендуется заказать поставку в течение ${Math.ceil(daysUntilOrder)} дней.`;
-    } else if (daysUntilOrder === Infinity) {
-        status = 'ok';
-        statusMessage = 'НОРМА (нет потребления)';
-        recommendation = 'Потребление азота не зафиксировано за последние 7 дней.';
     } else {
-        status = 'ok';
-        statusMessage = 'НОРМА';
-        recommendation = `Можно отложить заказ на ${Math.floor(daysUntilOrder)} дней.`;
+        daysToDeliveryElement.textContent = 'Недостаточно данных';
+        orderDateElement.textContent = 'Недостаточно данных';
+        deliveryDateElement.textContent = 'Недостаточно данных';
     }
     
-    // Расчет нового уровня после поставки
-    const newLevelAfterOrder = Math.min(MAX_LEVEL, currentLevel + ORDER_PERCENTAGE);
-    
-    // Отображение результатов
-    displayResults({
-        currentLevel,
-        deliveryDays,
-        avgDailyConsumption,
-        daysUntilOrder,
-        status,
-        statusMessage,
-        recommendation,
-        newLevelAfterOrder,
-        totalConsumption
-    });
+    // Автоматически сохраняем данные после расчета
+    saveData();
 }
 
-// Отображение ошибок
-function showError(message) {
-    document.getElementById('results-container').innerHTML = `
-        <div class="results">
-            <div class="result-item">
-                <div class="result-label">Ошибка:</div>
-                <div class="result-value warning">${message}</div>
-            </div>
-        </div>
-    `;
-}
-
-// Отображение результатов расчета
-function displayResults(data) {
-    const statusClass = data.status === 'critical' ? 'warning' : 
-                       data.status === 'warning' ? 'info' : 'ok';
-    
-    let daysDisplay = '';
-    if (data.daysUntilOrder === Infinity) {
-        daysDisplay = '∞ дней (нет потребления)';
-    } else if (data.daysUntilOrder > 1000) {
-        daysDisplay = '∞ дней';
-    } else {
-        daysDisplay = `${data.daysUntilOrder > 0 ? data.daysUntilOrder.toFixed(1) : '0'} дней`;
+// Функция для отображения уведомлений
+function showNotification(message, type) {
+    // Удаляем предыдущее уведомление, если оно есть
+    const existingNotification = document.querySelector('.notification');
+    if (existingNotification) {
+        existingNotification.remove();
     }
     
-    let resultsHTML = `
-        <div class="results">
-            <div class="result-item">
-                <div class="result-label">Статус:</div>
-                <div class="result-value ${statusClass}">${data.statusMessage}</div>
-            </div>
-            
-            <div class="result-item">
-                <div class="result-label">Текущий уровень азота:</div>
-                <div class="result-value">${data.currentLevel}%</div>
-            </div>
-            
-            <div class="result-item">
-                <div class="result-label">Среднее потребление за день (за 7 дней):</div>
-                <div class="result-value">${data.avgDailyConsumption.toFixed(2)}%</div>
-                <div style="font-size: 14px; color: #7f8c8d;">Всего за 7 дней: ${data.totalConsumption.toFixed(2)}%</div>
-            </div>
-            
-            <div class="result-item">
-                <div class="result-label">Дней до необходимого заказа:</div>
-                <div class="result-value">${daysDisplay}</div>
-            </div>
-            
-            <div class="result-item">
-                <div class="result-label">Рекомендация:</div>
-                <div class="result-value" style="font-size: 18px;">${data.recommendation}</div>
-            </div>
-            
-            <div class="result-item">
-                <div class="result-label">Уровень после поставки:</div>
-                <div class="result-value">${data.newLevelAfterOrder}%</div>
-                <div style="font-size: 14px; color: #7f8c8d;">Прибавка: ${ORDER_PERCENTAGE}%</div>
-            </div>
-        </div>
-    `;
+    // Создаем элемент уведомления
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.textContent = message;
     
-    document.getElementById('results-container').innerHTML = resultsHTML;
+    // Стилизуем уведомление
+    notification.style.position = 'fixed';
+    notification.style.top = '20px';
+    notification.style.right = '20px';
+    notification.style.padding = '15px 20px';
+    notification.style.borderRadius = '5px';
+    notification.style.color = 'white';
+    notification.style.fontWeight = '600';
+    notification.style.zIndex = '1000';
+    notification.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+    notification.style.transition = 'opacity 0.3s';
+    
+    // Цвета в зависимости от типа уведомления
+    if (type === 'success') {
+        notification.style.backgroundColor = '#2ecc71';
+    } else if (type === 'error') {
+        notification.style.backgroundColor = '#e74c3c';
+    } else {
+        notification.style.backgroundColor = '#3498db';
+    }
+    
+    // Добавляем уведомление на страницу
+    document.body.appendChild(notification);
+    
+    // Удаляем уведомление через 3 секунды
+    setTimeout(() => {
+        notification.style.opacity = '0';
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 300);
+    }, 3000);
 }
