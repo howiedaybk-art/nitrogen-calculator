@@ -19,16 +19,10 @@ document.addEventListener('DOMContentLoaded', function() {
     // Добавление новой строки в таблицу
     function addNewRow() {
         const tableBody = document.getElementById('tableBody');
-        
-        // Удаляем сообщение о пустой таблице, если оно есть
-        const emptyRow = tableBody.querySelector('.empty-row');
-        if (emptyRow) {
-            emptyRow.remove();
-        }
+        const rowNumber = tableBody.querySelectorAll('tr').length + 1;
         
         // Создаем новую строку
         const newRow = document.createElement('tr');
-        const rowNumber = tableBody.querySelectorAll('tr:not(.empty-row)').length + 1;
         
         newRow.innerHTML = `
             <td>
@@ -96,20 +90,16 @@ document.addEventListener('DOMContentLoaded', function() {
         const target = event.target;
         
         // Проверяем, была ли нажата кнопка удаления или ее дочерний элемент
-        if (target.classList.contains('delete-row') || target.closest('.delete-row')) {
-            const row = target.closest('tr');
+        const deleteBtn = target.closest('.delete-row');
+        if (deleteBtn) {
+            const row = deleteBtn.closest('tr');
             const tableBody = document.getElementById('tableBody');
-            const rows = tableBody.querySelectorAll('tr:not(.empty-row)');
+            const rows = tableBody.querySelectorAll('tr');
             
             // Не позволяем удалить последнюю строку
             if (rows.length > 1) {
                 row.remove();
                 updateRowNumbers(); // Обновляем номера строк
-                
-                // Если после удаления не осталось строк, показываем сообщение
-                if (tableBody.querySelectorAll('tr:not(.empty-row)').length === 0) {
-                    showEmptyTableMessage();
-                }
             } else {
                 alert('Должна остаться хотя бы одна строка для расчета');
             }
@@ -118,7 +108,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Обновление номеров строк
     function updateRowNumbers() {
-        const rows = document.querySelectorAll('#tableBody tr:not(.empty-row)');
+        const rows = document.querySelectorAll('#tableBody tr');
         rows.forEach((row, index) => {
             const rowNumberCell = row.querySelector('.row-number');
             if (rowNumberCell) {
@@ -129,7 +119,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Расчет итоговых сумм
     function calculateTotals() {
-        const rows = document.querySelectorAll('#tableBody tr:not(.empty-row)');
+        const rows = document.querySelectorAll('#tableBody tr');
         
         let totalWithoutVAT = 0;
         let totalVAT = 0;
@@ -168,9 +158,6 @@ document.addEventListener('DOMContentLoaded', function() {
             // Удаляем все строки
             tableBody.innerHTML = '';
             
-            // Показываем сообщение о пустой таблице
-            showEmptyTableMessage();
-            
             // Сбрасываем итоговые значения
             document.getElementById('totalWithoutVAT').innerHTML = `0 <span class="currency">₽</span>`;
             document.getElementById('totalVAT').innerHTML = `0 <span class="currency">₽</span>`;
@@ -181,19 +168,6 @@ document.addEventListener('DOMContentLoaded', function() {
             
             showNotification('Все данные очищены');
         }
-    }
-    
-    // Показать сообщение о пустой таблице
-    function showEmptyTableMessage() {
-        const tableBody = document.getElementById('tableBody');
-        tableBody.innerHTML = `
-            <tr class="empty-row">
-                <td colspan="9" class="empty-row-msg">
-                    <i class="fas fa-plus-circle" style="font-size: 24px; margin-bottom: 10px; display: block;"></i>
-                    Нажмите "Добавить строку" для начала расчета
-                </td>
-            </tr>
-        `;
     }
     
     // Форматирование денежных значений
