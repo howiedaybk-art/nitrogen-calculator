@@ -32,6 +32,7 @@ function addRow() {
         quantity: 0,
         priceWithoutVAT: 0,
         priceWithVAT: 0,
+        totalWithoutVAT: 0, // Добавлено: стоимость договора без НДС
         vatAmount: 0,
         totalWithVAT: 0
     });
@@ -46,9 +47,10 @@ function addRow() {
         <td><input type="number" class="quantity" min="0" step="0.01" placeholder="0" value=""></td>
         <td><input type="number" class="price" min="0" step="0.01" placeholder="0.00" value=""></td>
         <td><div class="result" id="priceWithVAT-${rowCount}">0.00</div></td>
+        <td><div class="result" id="totalWithoutVAT-${rowCount}">0.00</div></td>
         <td><div class="result" id="vatAmount-${rowCount}">0.00</div></td>
         <td><div class="result" id="totalWithVAT-${rowCount}">0.00</div></td>
-        <td><button class="btn-delete" onclick="deleteRow(${rowCount - 1})" style="padding: 5px 10px; font-size: 12px;"><i class="fas fa-times"></i></button></td>
+        <td><button class="btn-delete" onclick="deleteRow(${rowCount - 1})" style="padding: 5px 10px; font-size: 12px; background: transparent; border: 1px solid #ddd; color: #666;"><i class="fas fa-times"></i></button></td>
     `;
     
     tableBody.appendChild(newRow);
@@ -132,6 +134,7 @@ function updateRowNumbers() {
         
         // Обновляем ID элементов результатов
         row.querySelector(`#priceWithVAT-${index + 2}`).id = `priceWithVAT-${index + 1}`;
+        row.querySelector(`#totalWithoutVAT-${index + 2}`).id = `totalWithoutVAT-${index + 1}`;
         row.querySelector(`#vatAmount-${index + 2}`).id = `vatAmount-${index + 1}`;
         row.querySelector(`#totalWithVAT-${index + 2}`).id = `totalWithVAT-${index + 1}`;
         
@@ -150,6 +153,9 @@ function calculateRow(rowIndex) {
     // Расчет стоимости единицы с НДС
     data.priceWithVAT = data.priceWithoutVAT * (1 + VAT_RATE);
     
+    // Расчет стоимости договора без НДС (общая стоимость без НДС)
+    data.totalWithoutVAT = data.priceWithoutVAT * data.quantity;
+    
     // Расчет НДС для единицы товара
     data.vatPerUnit = data.priceWithoutVAT * VAT_RATE;
     
@@ -161,6 +167,7 @@ function calculateRow(rowIndex) {
     
     // Обновление отображения в таблице
     document.getElementById(`priceWithVAT-${data.id}`).textContent = formatCurrency(data.priceWithVAT);
+    document.getElementById(`totalWithoutVAT-${data.id}`).textContent = formatCurrency(data.totalWithoutVAT); // Добавлено
     document.getElementById(`vatAmount-${data.id}`).textContent = formatCurrency(data.vatAmount);
     document.getElementById(`totalWithVAT-${data.id}`).textContent = formatCurrency(data.totalWithVAT);
 }
@@ -171,7 +178,9 @@ function calculateAll() {
         calculateRow(i);
     }
     updateTotals();
-    alert("Все значения пересчитаны!");
+    
+    // Показать уведомление о пересчете
+    showNotification('Все значения пересчитаны!', 'success');
 }
 
 // Функция для обновления итоговых значений
@@ -182,8 +191,7 @@ function updateTotals() {
     
     // Суммируем данные из всех строк
     contractsData.forEach(data => {
-        const rowTotalWithoutVAT = data.priceWithoutVAT * data.quantity;
-        totalWithoutVAT += rowTotalWithoutVAT;
+        totalWithoutVAT += data.totalWithoutVAT; // Используем уже рассчитанное значение
         totalVAT += data.vatAmount;
         totalWithVAT += data.totalWithVAT;
     });
@@ -208,12 +216,38 @@ function formatCurrency(value) {
     });
 }
 
+// Функция для показа уведомлений
+function showNotification(message, type = 'info') {
+    // Удаляем предыдущее уведомление, если есть
+    const existingNotification = document.querySelector('.notification');
+    if (existingNotification) {
+        existingNotification.remove();
+    }
+    
+    // Создаем новое уведомление
+    const notification = document.createElement('div');
+    notification.className = `notification notification-${type}`;
+    notification.innerHTML = `
+        <div style="position: fixed; top: 20px; right: 20px; background: white; padding: 15px 20px; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); border-left: 4px solid ${type === 'success' ? '#28a745' : '#4a6ee0'}; z-index: 1000; display: flex; align-items: center; gap: 10px; max-width: 300px;">
+            <i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-info-circle'}" style="color: ${type === 'success' ? '#28a745' : '#4a6ee0'}"></i>
+            <span>${message}</span>
+        </div>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Удаляем уведомление через 3 секунды
+    setTimeout(() => {
+        notification.remove();
+    }, 3000);
+}
+
 // Экспорт данных в JSON (дополнительная функция)
 function exportData() {
     const dataToExport = {
         contracts: contractsData,
         totals: {
-            totalWithoutVAT: contractsData.reduce((sum, data) => sum + (data.priceWithoutVAT * data.quantity), 0),
+            totalWithoutVAT: contractsData.reduce((sum, data) => sum + data.totalWithoutVAT, 0),
             totalVAT: contractsData.reduce((sum, data) => sum + data.vatAmount, 0),
             totalWithVAT: contractsData.reduce((sum, data) => sum + data.totalWithVAT, 0)
         },
@@ -275,12 +309,12 @@ function importData() {
                     
                     // Пересчитываем все
                     calculateAll();
-                    alert(`Данные успешно импортированы! Загружено ${importedData.contracts.length} строк.`);
+                    showNotification(`Данные успешно импортированы! Загружено ${importedData.contracts.length} строк.`, 'success');
                 } else {
-                    alert('Ошибка: неверный формат файла!');
+                    showNotification('Ошибка: неверный формат файла!', 'error');
                 }
             } catch (error) {
-                alert('Ошибка при чтении файла: ' + error.message);
+                showNotification('Ошибка при чтении файла: ' + error.message, 'error');
             }
         };
         
